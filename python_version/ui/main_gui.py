@@ -811,6 +811,13 @@ class CyberFlashUltra:
         self.hex_text = scrolledtext.ScrolledText(self.hex_frame, bg=self.clr_bg, fg=self.clr_accent, 
                                                  font=("Consolas", 12), borderwidth=0, highlightthickness=0)
         self.hex_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Intercept mousewheel when empty to lock to a single page
+        def _on_hex_scroll(event):
+            if not self.buffer_data:
+                return "break"
+        self.hex_text.bind("<MouseWheel>", _on_hex_scroll)
+
         self.fill_dummy_hex()
 
         def _show_tab(tab_name):
@@ -2749,11 +2756,11 @@ class CyberFlashUltra:
         self.hex_text.delete(1.0, tk.END)
         header = "Offset (h) 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F Decoded text\n"
         dummy = header
-        for i in range(100):
+        for i in range(8):
             addr = format(i * 16, '08X')
             bytes_str = " ".join(["FF"] * 16)
             dummy += f"{addr}   {bytes_str} ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ\n"
-        self.hex_text.insert(tk.END, dummy)
+        self.hex_text.insert(tk.END, dummy.rstrip("\n"))
         self.hex_text.yview_moveto(0.0)
 
 

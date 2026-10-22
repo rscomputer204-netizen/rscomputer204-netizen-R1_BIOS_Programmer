@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.0",
+    "version": "R1.0.1.1",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Fixed updater directory permission error and locked hexviewer scroll when empty.",
-    "date": "2026-10-22 05:50:21"
+    "changelog": "HexViewer scroll lock when empty and restored vertical scrollbar on loaded data.",
+    "date": "2026-10-22 06:11:55"
 }

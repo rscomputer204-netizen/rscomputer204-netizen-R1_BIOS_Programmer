@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.7",
+    "version": "R1.0.1.8",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Clean in-memory reload and explicit subprocess environment on automatic restart.",
-    "date": "2026-10-22 07:51:52"
+    "changelog": "HexViewer updated to 40 lines dummy data",
+    "date": "2026-10-22 07:57:31"
 }

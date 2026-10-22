@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.2",
+    "version": "R1.0.1.3",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Added new features, optimized performance, and fixed identified bugs.",
-    "date": "2026-10-22 07:09:47"
+    "changelog": "Live Update Hot-Reload Hook enabled for instant GitHub update sync.",
+    "date": "2026-10-22 07:16:22"
 }

@@ -1,8 +1,24 @@
+import sys
+import os
+
+# --- LIVE GITHUB UPDATE HOT-RELOAD HOOK ---
+# When running as frozen PyInstaller EXE, dynamically run the latest disk-based main_gui.py
+# so that all GitHub updates downloaded by updater.exe take effect immediately!
+if getattr(sys, 'frozen', False) and not os.environ.get("_R1_HOT_RELOADED"):
+    base_dir = os.path.dirname(sys.executable)
+    disk_gui = os.path.join(base_dir, "python_version", "ui", "main_gui.py")
+    if os.path.exists(disk_gui):
+        os.environ["_R1_HOT_RELOADED"] = "1"
+        py_dir = os.path.join(base_dir, "python_version")
+        if py_dir not in sys.path:
+            sys.path.insert(0, py_dir)
+        import runpy
+        runpy.run_path(disk_gui, run_name="__main__")
+        sys.exit(0)
+
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 import datetime
-import sys
-import os
 import winsound
 import time
 import threading

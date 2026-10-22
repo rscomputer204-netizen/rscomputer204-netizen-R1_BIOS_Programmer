@@ -1,0 +1,7 @@
+MISSING_TOOLS:
+1. ME Analyzer (MEA.exe)
+2. UEFITool (UEFITool.exe)
+3. ME Cleaner (me_cleaner.py)
+
+Please download these tools and place them in c:\Users\hp\Desktop\driver\driver\python_version\tools
+See README.txt for more details.

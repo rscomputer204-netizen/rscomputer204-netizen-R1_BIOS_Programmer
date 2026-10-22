@@ -1,0 +1,17 @@
+CRITICAL: Python is NOT installed.
+
+Please follow these steps:
+
+1.  **Install Python 3.12+**
+    *   Download from [python.org](https://www.python.org/downloads/) OR via Microsoft Store.
+    *   **IMPORTANT**: Check the box "Add Python to PATH" during installation.
+
+2.  **Download Missing Tools**
+    *   MEA.exe
+    *   UEFITool.exe
+    *   me_cleaner.py
+    *   Place them in `c:\Users\hp\Desktop\driver\driver\python_version\tools`
+
+3.  **Restart Terminal/VSCode**
+    *   After installing Python, you must restart your editor/terminal for the path changes to take effect.
+    *   Then run: `pip install -r requirements.txt`

@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Build and Distribution folders
+build/
+dist/
+update_cache/
+backup/
+
+# Logs and Crash dumps
+logs/
+*.log
+crash_log.txt
+*.dump
+
+# Other external projects / folders
+BIOS_-TOOL/
+code-graph-rag/
+knowledge_graph/
+
+# Database and Cache
+kg.db
+kg_index_state.json
+qdrant_db/
+temp_repair/
+scratch/
+.chat_saver_state.json
+
+# Local Secrets & Tokens
+config/github_token.json
+config/*.json
+
+# PyInstaller internal bundle
+python_version/_internal/
+_internal/
+

@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.6",
+    "version": "R1.0.1.7",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Set HexViewer dummy data to 30 lines with full binary package.",
-    "date": "2026-10-22 07:39:08"
+    "changelog": "Clean in-memory reload and explicit subprocess environment on automatic restart.",
+    "date": "2026-10-22 07:51:52"
 }

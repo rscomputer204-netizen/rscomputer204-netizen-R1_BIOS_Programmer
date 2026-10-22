@@ -3,12 +3,12 @@ import os
 
 # --- LIVE GITHUB UPDATE HOT-RELOAD HOOK ---
 # When running as frozen PyInstaller EXE, dynamically run the latest disk-based main_gui.py
-# so that all GitHub updates downloaded by updater.exe take effect immediately!
-if getattr(sys, 'frozen', False) and not os.environ.get("_R1_HOT_RELOADED"):
+# so that all GitHub updates downloaded by updater.exe take effect immediately on automatic restart!
+if getattr(sys, 'frozen', False) and not getattr(sys, '_r1_hot_reloaded', False):
+    sys._r1_hot_reloaded = True
     base_dir = os.path.dirname(sys.executable)
     disk_gui = os.path.join(base_dir, "python_version", "ui", "main_gui.py")
     if os.path.exists(disk_gui):
-        os.environ["_R1_HOT_RELOADED"] = "1"
         py_dir = os.path.join(base_dir, "python_version")
         if py_dir not in sys.path:
             sys.path.insert(0, py_dir)
@@ -2230,8 +2230,10 @@ class CyberFlashUltra:
             pid = os.getpid()
             self.log_write(f"SYSTEM: HANDING OVER TO UPDATER (PID: {pid})...")
             
-            # Launch updater with PID argument
-            subprocess.Popen([updater_exe, str(pid)])
+            # Launch updater with PID argument and clean working directory
+            clean_env = os.environ.copy()
+            clean_env.pop("_R1_HOT_RELOADED", None)
+            subprocess.Popen([updater_exe, str(pid)], cwd=base_dir, env=clean_env)
             
             # Exit clean
             self.root.destroy()

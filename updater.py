@@ -239,7 +239,9 @@ def main():
     main_exe = os.path.join(base_dir, MAIN_EXE_NAME)
     if os.path.exists(main_exe):
         log(f"Relaunching {MAIN_EXE_NAME}...")
-        subprocess.Popen([main_exe])
+        clean_env = os.environ.copy()
+        clean_env.pop("_R1_HOT_RELOADED", None)
+        subprocess.Popen([main_exe], cwd=base_dir, env=clean_env)
     else:
         log(f"CRITICAL: Main executable not found at {main_exe}", "error")
 

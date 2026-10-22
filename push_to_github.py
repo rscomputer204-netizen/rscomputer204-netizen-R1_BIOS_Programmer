@@ -446,19 +446,33 @@ class GitPushGUI:
                     shutil.rmtree(payload_dir, ignore_errors=True)
                 os.makedirs(payload_dir, exist_ok=True)
 
+                payload_content = os.path.join(payload_dir, "payload")
+                os.makedirs(payload_content, exist_ok=True)
+
                 shutil.copytree(
                     os.path.join(BASE_DIR, "python_version"),
-                    os.path.join(payload_dir, "payload", "python_version"),
+                    os.path.join(payload_content, "python_version"),
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "_internal")
                 )
                 if os.path.exists(os.path.join(BASE_DIR, "chiplist.xml")):
-                    shutil.copy2(os.path.join(BASE_DIR, "chiplist.xml"), os.path.join(payload_dir, "payload", "chiplist.xml"))
+                    shutil.copy2(os.path.join(BASE_DIR, "chiplist.xml"), os.path.join(payload_content, "chiplist.xml"))
                 shutil.copy2(os.path.join(BASE_DIR, "version.txt"), os.path.join(payload_dir, "version.txt"))
+
+                # Collect all individual files inside payload for manifest
+                # Important: existing updater.exe calls shutil.copy2 on each entry in manifest["files"],
+                # so every entry MUST be a file path, never a directory name.
+                manifest_files = []
+                for root, dirs, files in os.walk(payload_content):
+                    dirs[:] = [d for d in dirs if d != "__pycache__"]
+                    for f in files:
+                        abs_p = os.path.join(root, f)
+                        rel_p = os.path.relpath(abs_p, payload_content).replace("\\", "/")
+                        manifest_files.append(rel_p)
 
                 manifest = {
                     "version": target_ver,
                     "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "files": ["chiplist.xml", "python_version/"]
+                    "files": sorted(manifest_files)
                 }
                 with open(os.path.join(payload_dir, "manifest.json"), "w", encoding="utf-8") as f:
                     json.dump(manifest, f, indent=4)

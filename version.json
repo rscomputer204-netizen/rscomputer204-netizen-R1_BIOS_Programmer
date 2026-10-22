@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.0.9",
+    "version": "R1.0.1.0",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Added new features, optimized performance, and fixed identified bugs.",
-    "date": "2026-10-22 05:44:00"
+    "changelog": "Fixed updater directory permission error and locked hexviewer scroll when empty.",
+    "date": "2026-10-22 05:50:21"
 }

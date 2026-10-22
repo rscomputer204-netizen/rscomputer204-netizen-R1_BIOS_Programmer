@@ -91,8 +91,11 @@ def create_backup(manifest, root_dir):
         dst = os.path.join(backup_path, rel_path)
         
         if os.path.exists(src):
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(src, dst)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
             backup_map.append((src, dst))
             # log(f"Backed up: {rel_path}")
         else:
@@ -124,9 +127,11 @@ def perform_update(manifest, cache_path, root_dir):
             log(f"Warning: Source file missing in payload: {rel_path}", "warning")
             continue
             
-        # Ensure dir exists
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        else:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
         log(f"Updated: {rel_path}")
 
     # 2. Update Version File

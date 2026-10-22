@@ -2773,7 +2773,7 @@ class CyberFlashUltra:
         self.hex_text.delete(1.0, tk.END)
         header = "Offset (h) 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F Decoded text\n"
         dummy = header
-        for i in range(100):
+        for i in range(50):
             addr = format(i * 16, '08X')
             bytes_str = " ".join(["FF"] * 16)
             dummy += f"{addr}   {bytes_str} ................\n"

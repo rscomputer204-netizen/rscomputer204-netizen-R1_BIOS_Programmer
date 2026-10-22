@@ -439,8 +439,8 @@ class GitPushGUI:
                         f.write(target_ver)
                 self.log(f"Updated local version to {target_ver}.")
 
-                # 2. Package lightweight update.zip (exclude _internal)
-                self.log("Creating update.zip bundle (excluding internal binaries)...")
+                # 2. Package complete update.zip with executable and scripts
+                self.log("Creating update.zip bundle with executables and scripts...")
                 payload_dir = os.path.join(BASE_DIR, "temp_update_payload")
                 if os.path.exists(payload_dir):
                     shutil.rmtree(payload_dir, ignore_errors=True)
@@ -449,18 +449,36 @@ class GitPushGUI:
                 payload_content = os.path.join(payload_dir, "payload")
                 os.makedirs(payload_content, exist_ok=True)
 
+                dist_source = os.path.join(BASE_DIR, "dist", "R1_BIOS_Programmer")
+                forbidden = {"updater.exe", "drivers", "logs", "backup", "update_cache", "tools"}
+
+                if os.path.exists(dist_source):
+                    for root, dirs, files in os.walk(dist_source):
+                        dirs[:] = [d for d in dirs if d not in forbidden and d != "__pycache__"]
+                        for f in files:
+                            if f in forbidden or f.endswith(".log") or f.endswith(".dump"):
+                                continue
+                            abs_p = os.path.join(root, f)
+                            rel_p = os.path.relpath(abs_p, dist_source)
+                            dest_p = os.path.join(payload_content, rel_p)
+                            os.makedirs(os.path.dirname(dest_p), exist_ok=True)
+                            shutil.copy2(abs_p, dest_p)
+
+                # Ensure python_version source is also copied into payload/python_version
+                dest_py_ver = os.path.join(payload_content, "python_version")
+                if os.path.exists(dest_py_ver):
+                    shutil.rmtree(dest_py_ver, ignore_errors=True)
                 shutil.copytree(
                     os.path.join(BASE_DIR, "python_version"),
-                    os.path.join(payload_content, "python_version"),
-                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "_internal")
+                    dest_py_ver,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "_internal", "tools")
                 )
+
                 if os.path.exists(os.path.join(BASE_DIR, "chiplist.xml")):
                     shutil.copy2(os.path.join(BASE_DIR, "chiplist.xml"), os.path.join(payload_content, "chiplist.xml"))
                 shutil.copy2(os.path.join(BASE_DIR, "version.txt"), os.path.join(payload_dir, "version.txt"))
 
                 # Collect all individual files inside payload for manifest
-                # Important: existing updater.exe calls shutil.copy2 on each entry in manifest["files"],
-                # so every entry MUST be a file path, never a directory name.
                 manifest_files = []
                 for root, dirs, files in os.walk(payload_content):
                     dirs[:] = [d for d in dirs if d != "__pycache__"]

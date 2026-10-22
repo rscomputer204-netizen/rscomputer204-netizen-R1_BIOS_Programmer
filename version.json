@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.1",
+    "version": "R1.0.1.2",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "HexViewer scroll lock when empty and restored vertical scrollbar on loaded data.",
-    "date": "2026-10-22 06:11:55"
+    "changelog": "Added new features, optimized performance, and fixed identified bugs.",
+    "date": "2026-10-22 07:09:47"
 }

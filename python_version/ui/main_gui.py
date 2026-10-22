@@ -807,26 +807,11 @@ class CyberFlashUltra:
         self.log_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=(5, 5))
 
         # Hex Area
+        # Hex Area
         self.hex_frame = tk.Frame(self.tab_content_frame, bg=self.clr_bg)
         self.hex_text = scrolledtext.ScrolledText(self.hex_frame, bg=self.clr_bg, fg=self.clr_accent, 
                                                  font=("Consolas", 12), borderwidth=0, highlightthickness=0)
         self.hex_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Intercept and control yview: lock scrolling when buffer is empty
-        self._orig_hex_yview = self.hex_text.yview
-        def _controlled_hex_yview(*args):
-            if not self.buffer_data:
-                return (0.0, 1.0)
-            return self._orig_hex_yview(*args)
-        self.hex_text.yview = _controlled_hex_yview
-        self.hex_text.vbar['command'] = _controlled_hex_yview
-
-        # Block any keyboard or mouse scroll events when empty
-        def _block_hex_scroll(event):
-            if not self.buffer_data:
-                return "break"
-        for _seq in ("<MouseWheel>", "<Button-4>", "<Button-5>", "<Prior>", "<Next>", "<Up>", "<Down>"):
-            self.hex_text.bind(_seq, _block_hex_scroll)
 
         self.fill_dummy_hex()
 
@@ -841,14 +826,7 @@ class CyberFlashUltra:
                 self.log_container.pack(fill=tk.BOTH, expand=True)
             elif tab_name == "HEX":
                 self.hex_frame.pack(fill=tk.BOTH, expand=True)
-                if not self.buffer_data:
-                    if hasattr(self.hex_text, 'vbar'):
-                        self.hex_text.vbar.pack_forget()
-                    if hasattr(self, '_orig_hex_yview'):
-                        self._orig_hex_yview('moveto', 0.0)
-                else:
-                    if hasattr(self.hex_text, 'vbar'):
-                        self.hex_text.vbar.pack(side=tk.RIGHT, fill=tk.Y)
+                self.hex_text.yview_moveto(0.0)
 
         self.show_tab = _show_tab
         self.show_tab("LOG")
@@ -2748,7 +2726,6 @@ class CyberFlashUltra:
             self.fill_dummy_hex()
             return
         
-        # When actual data is present, restore vertical scrollbar so user can scroll full dump
         if hasattr(self.hex_text, 'vbar'):
             self.hex_text.vbar.pack(side=tk.RIGHT, fill=tk.Y)
             
@@ -2772,27 +2749,20 @@ class CyberFlashUltra:
         self.hex_text.insert(tk.END, "\n".join(result))
         if len(data) > limit:
             self.hex_text.insert(tk.END, f"\n\n--- PREVIEW LIMITED TO FIRST 64KB (TOTAL SIZE: {len(data)} BYTES) ---")
-        if hasattr(self, '_orig_hex_yview'):
-            self._orig_hex_yview('moveto', 0.0)
-        else:
-            self.hex_text.yview_moveto(0.0)
+        self.hex_text.yview_moveto(0.0)
 
     def fill_dummy_hex(self):
-        # When empty, hide the vertical scrollbar so it is strictly a single static page
         if hasattr(self.hex_text, 'vbar'):
-            self.hex_text.vbar.pack_forget()
+            self.hex_text.vbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.hex_text.delete(1.0, tk.END)
         header = "Offset (h) 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F Decoded text\n"
         dummy = header
-        for i in range(8):
+        for i in range(100):
             addr = format(i * 16, '08X')
             bytes_str = " ".join(["FF"] * 16)
             dummy += f"{addr}   {bytes_str} ................\n"
         self.hex_text.insert(tk.END, dummy.rstrip("\n"))
-        if hasattr(self, '_orig_hex_yview'):
-            self._orig_hex_yview('moveto', 0.0)
-        else:
-            self.hex_text.yview_moveto(0.0)
+        self.hex_text.yview_moveto(0.0)
 
 
 

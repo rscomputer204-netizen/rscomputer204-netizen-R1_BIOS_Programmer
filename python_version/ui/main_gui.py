@@ -470,12 +470,16 @@ class CyberFlashUltra:
 
     def create_layout(self):
         # --- Top Navigation / Header ---
-        header = tk.Frame(self.root, bg=self.clr_header)
-        header.pack(side=tk.TOP, fill=tk.X)
+        self.header = tk.Frame(self.root, bg=self.clr_header)
+        self.header.pack(side=tk.TOP, fill=tk.X)
+        
+        # 1. Top Bar: App Branding on Left, System Controls on Right
+        self.header_top_row = tk.Frame(self.header, bg=self.clr_header)
+        self.header_top_row.pack(side=tk.TOP, fill=tk.X, padx=(20, 20), pady=(8, 4))
         
         # App Branding
-        brand_frame = tk.Frame(header, bg=self.clr_header)
-        brand_frame.pack(side=tk.LEFT, padx=(20, 20), pady=10)
+        brand_frame = tk.Frame(self.header_top_row, bg=self.clr_header)
+        brand_frame.pack(side=tk.LEFT)
         
         if self.header_logo:
             tk.Label(brand_frame, image=self.header_logo, bg=self.clr_header).pack(side=tk.LEFT, padx=(0, 10))
@@ -485,8 +489,19 @@ class CyberFlashUltra:
         tk.Label(brand_frame, text="ULTRA", bg=self.clr_header, fg="white", 
                  font=("Orbitron", 12)).pack(side=tk.LEFT, padx=(5, 0), pady=(5, 0))
 
-        # Main Action Buttons (Left side) - Responsive Flow Container
-        self.main_btn_frame = tk.Frame(header, bg=self.clr_header)
+        # Right-side Buttons (Master & System)
+        right_btn_frame = tk.Frame(self.header_top_row, bg=self.clr_header)
+        right_btn_frame.pack(side=tk.RIGHT)
+        
+        # Slot in top row between brand and right controls (for wide screen single row)
+        self.top_nav_slot = tk.Frame(self.header_top_row, bg=self.clr_header)
+        self.top_nav_slot.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+
+        # 2. Bottom Toolbar Frame (Dedicated full-width row along user red mark when in small window)
+        self.bottom_nav_slot = tk.Frame(self.header, bg=self.clr_header)
+
+        # Main Action Buttons Container
+        self.main_btn_frame = tk.Frame(self.top_nav_slot, bg=self.clr_header)
         self.main_btn_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Store button configs to repack them responsive
@@ -510,10 +525,6 @@ class CyberFlashUltra:
             if len(b_info) > 2: is_danger = b_info[2]
             self.create_nav_btn(b_info[0], b_info[1], is_danger)
 
-        # Right-side Buttons (Master & System)
-        right_btn_frame = tk.Frame(header, bg=self.clr_header)
-        right_btn_frame.pack(side=tk.RIGHT, padx=20, pady=10)
-        
         # AUTO Group
         auto_group = tk.Frame(right_btn_frame, bg=self.clr_header)
         auto_group.pack(side=tk.LEFT)
@@ -867,28 +878,9 @@ class CyberFlashUltra:
     def repack_header_buttons(self, event=None, force=False):
         try:
             current_width = self.root.winfo_width()
-            if current_width < 200: current_width = 800 
-            
-            # space available = width - branding(250) - right_buttons(300)
-            available = current_width - 600
-            if available < 100: available = 100
-            
-            # Calculate required columns
-            max_cols = int(available / 120)  # Increased from 110 for stability
-            if max_cols < 1: max_cols = 1
+            if current_width < 200: current_width = 1100 
             
             curr_proto = getattr(self, "current_protocol", "SPI").upper()
-            
-            # OPTIMIZATION: Only repack if layout actually changes
-            if not force and hasattr(self, "_last_max_cols") and self._last_max_cols == max_cols and getattr(self, "_last_proto_repack", "") == curr_proto:
-                return
-
-            self._last_max_cols = max_cols
-            self._last_proto_repack = curr_proto
-
-            # Clear current mapped buttons
-            for widget in self.main_btn_frame.winfo_children():
-                widget.destroy()
             
             # Filter active buttons based on protocol
             active_buttons = []
@@ -900,15 +892,51 @@ class CyberFlashUltra:
                         continue
                 active_buttons.append(btn_data)
 
-            row = 0
-            col = 0
+            # Available width in top row between brand and right controls
+            top_available = current_width - 620
             
+            # Needed width for all buttons in one single row
+            needed_single_row_width = len(active_buttons) * 85
+            
+            # When screen is small / normal (< 1350px or top space isn't enough):
+            # Move to bottom toolbar row (full width, exactly along the user's red mark)
+            use_bottom_toolbar = (current_width < 1350) or (top_available < needed_single_row_width)
+            
+            layout_key = (use_bottom_toolbar, curr_proto, len(active_buttons))
+            if not force and hasattr(self, "_last_layout_key") and self._last_layout_key == layout_key:
+                return
+            self._last_layout_key = layout_key
+
+            # Clear buttons
+            if hasattr(self, 'main_btn_frame') and self.main_btn_frame.winfo_exists():
+                for widget in self.main_btn_frame.winfo_children():
+                    widget.destroy()
+
+            # Switch container parent
+            if use_bottom_toolbar:
+                if hasattr(self, 'top_nav_slot'):
+                    self.top_nav_slot.pack_forget()
+                if hasattr(self, 'bottom_nav_slot'):
+                    self.bottom_nav_slot.pack(side=tk.TOP, fill=tk.X, padx=20, pady=(2, 6))
+                    if hasattr(self, 'main_btn_frame') and self.main_btn_frame.winfo_exists():
+                        self.main_btn_frame.destroy()
+                    self.main_btn_frame = tk.Frame(self.bottom_nav_slot, bg=self.clr_header)
+                    self.main_btn_frame.pack(side=tk.LEFT)
+            else:
+                if hasattr(self, 'bottom_nav_slot'):
+                    self.bottom_nav_slot.pack_forget()
+                if hasattr(self, 'top_nav_slot'):
+                    self.top_nav_slot.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+                    if hasattr(self, 'main_btn_frame') and self.main_btn_frame.winfo_exists():
+                        self.main_btn_frame.destroy()
+                    self.main_btn_frame = tk.Frame(self.top_nav_slot, bg=self.clr_header)
+                    self.main_btn_frame.pack(side=tk.LEFT)
+
+            # Add all buttons strictly in row 0 (single horizontal line)
+            col = 0
             for btn_data in active_buttons:
-                 self._add_btn_to_frame(self.main_btn_frame, btn_data["text"], btn_data["cmd"], btn_data["danger"], row, col)
-                 col += 1
-                 if col >= max_cols:
-                     col = 0
-                     row += 1
+                self._add_btn_to_frame(self.main_btn_frame, btn_data["text"], btn_data["cmd"], btn_data["danger"], 0, col)
+                col += 1
         except Exception as e:
             print(f"Repack Error: {e}")
 
@@ -981,12 +1009,15 @@ class CyberFlashUltra:
             self.notify_cyber("SYSTEM RECOVERY", suggestion, "WARNING")
 
     def _responsive_tracker(self):
-        # Track software window state for responsive layout adjustments
+        # Track software window state and width for responsive layout adjustments
         current_state = self.root.state()
+        current_width = self.root.winfo_width()
         last_state = getattr(self, "_last_track_state", "")
+        last_width = getattr(self, "_last_track_width", 0)
         
-        if current_state != last_state:
+        if current_state != last_state or abs(current_width - last_width) > 30:
             self._last_track_state = current_state
+            self._last_track_width = current_width
             self.repack_header_buttons()
 
         # Loop every 200ms to guarantee tracking works flawlessly

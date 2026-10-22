@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.9",
+    "version": "R1.0.2.0",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "HexViewer updated to 45 lines dummy data",
-    "date": "2026-10-22 08:03:28"
+    "changelog": "Header responsive toolbar: single straight line for action buttons in small window",
+    "date": "2026-10-22 09:02:18"
 }

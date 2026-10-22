@@ -1,6 +1,6 @@
 {
-    "version": "R1.0.1.5",
+    "version": "R1.0.1.6",
     "url": "https://raw.githubusercontent.com/rscomputer204-netizen/rscomputer204-netizen-R1_BIOS_Programmer/main/update.zip",
-    "changelog": "Full package update with binary executable, internal runtime, and 50-line HexViewer.",
-    "date": "2026-10-22 07:30:44"
+    "changelog": "Set HexViewer dummy data to 30 lines with full binary package.",
+    "date": "2026-10-22 07:39:08"
 }

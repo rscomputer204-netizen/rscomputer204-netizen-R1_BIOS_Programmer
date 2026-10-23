@@ -887,8 +887,8 @@ class CyberFlashUltra:
         # Initialize default protocol layout (SPI Mode)
         self.switch_protocol_layout("SPI")
 
-        # Silent automatic update check on application startup (delayed 3.0s for smooth launch)
-        self.root.after(3000, self.auto_check_update_startup)
+        # Start persistent cloud auto-update background service
+        self.start_background_update_service()
 
     def create_nav_btn(self, text, command, is_danger=False):
         # Store for loose packing
@@ -2040,32 +2040,66 @@ class CyberFlashUltra:
 
         self.show_progress_dialog(f"READING CHIP", size, read_task)
 
-    def auto_check_update_startup(self):
-        """Silent background update checker triggered automatically on software launch."""
-        def _check_worker():
-            try:
-                response = requests.get(self.update_url, timeout=8)
-                if response.status_code == 200:
-                    data = response.json()
-                    remote_version = data.get("version", "0.0.0")
-                    download_url = data.get("url", "")
-                    changelog = data.get("changelog", "No details provided.")
+    def start_background_update_service(self):
+        """Persistent background worker that monitors updates on launch and periodically every 2 minutes."""
+        def _bg_worker():
+            # Initial startup delay (3.5s) to let UI render and hardware init finish
+            time.sleep(3.5)
+            while not getattr(self, "_is_shutting_down", False):
+                try:
+                    self._execute_cloud_update_check()
+                except Exception as e:
+                    print(f"[BG_UPDATER] Exception during update check: {e}")
 
-                    # Convert GitHub Blob URL to Raw URL if needed
-                    if "github.com" in download_url and "/blob/" in download_url:
-                        download_url = download_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+                # Sleep 120 seconds between checks, checking shutdown flag every 1s
+                for _ in range(120):
+                    if getattr(self, "_is_shutting_down", False):
+                        return
+                    time.sleep(1)
 
-                    current_ver_str = self.app_version
-                    if is_newer_version(remote_version, current_ver_str):
-                        self.root.after(0, lambda: self._prompt_auto_update(remote_version, changelog, download_url))
-            except Exception:
-                # Completely silent on startup failure/offline - do not interrupt user
-                pass
+        threading.Thread(target=_bg_worker, daemon=True).start()
 
-        threading.Thread(target=_check_worker, daemon=True).start()
+    def _execute_cloud_update_check(self):
+        """Worker executing network fetch with cache-busting."""
+        # Wait if user is currently performing flash read/write operations
+        retries = 0
+        while getattr(self, "io_busy", False) and retries < 10:
+            time.sleep(2)
+            retries += 1
+        if getattr(self, "io_busy", False) or getattr(self, "_update_prompt_active", False):
+            return
+
+        try:
+            nocache_url = f"{self.update_url}?t={int(time.time())}"
+            headers = {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+            response = requests.get(nocache_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                remote_version = str(data.get("version", "0.0.0")).strip()
+                download_url = data.get("url", "")
+                changelog = data.get("changelog", "No details provided.")
+
+                if "github.com" in download_url and "/blob/" in download_url:
+                    download_url = download_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
+                current_ver_str = str(self.app_version).strip()
+                if is_newer_version(remote_version, current_ver_str):
+                    self.log_write(f"SYSTEM: UPDATE AVAILABLE -> v{remote_version} (Current: v{current_ver_str})")
+                    self.root.after(0, lambda: self._prompt_auto_update(remote_version, changelog, download_url))
+                else:
+                    # Log up-to-date on initial check so user knows background check is actively running
+                    if not getattr(self, "_logged_update_status", False):
+                        self._logged_update_status = True
+                        self.log_write(f"SYSTEM: AUTO-UPDATE ACTIVE - v{current_ver_str} IS LATEST.")
+        except Exception as e:
+            print(f"[BG_UPDATER] Network error: {e}")
 
     def _prompt_auto_update(self, remote_version, changelog, download_url):
-        """Displays a cyberpunk update prompt when an update is detected on startup."""
+        """Displays a cyberpunk update prompt when an update is detected on startup or in background."""
         if getattr(self, "_update_prompt_active", False) or getattr(self, "io_busy", False):
             return
         self._update_prompt_active = True
@@ -2082,9 +2116,12 @@ class CyberFlashUltra:
         y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - 180
         win.geometry(f"+{x}+{y}")
 
-        def on_close():
+        def on_close(event=None):
             self._update_prompt_active = False
-            win.destroy()
+            try:
+                win.destroy()
+            except Exception:
+                pass
 
         win.protocol("WM_DELETE_WINDOW", on_close)
 
@@ -2183,7 +2220,13 @@ class CyberFlashUltra:
                 # Disable Hardware Interaction buttons for safety
                 self.root.after(0, lambda: self.set_safe_mode(True))
                 
-                response = requests.get(self.update_url, timeout=10)
+                nocache_url = f"{self.update_url}?t={int(time.time())}"
+                headers = {
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+                response = requests.get(nocache_url, headers=headers, timeout=10)
                 if response.status_code == 200:
                     data = response.json()
                     remote_version = data.get("version", "0.0.0")
@@ -3605,6 +3648,7 @@ class CyberFlashUltra:
             pass
 
     def on_close(self):
+        self._is_shutting_down = True
         self.save_layout_config()
         self.root.destroy()
 

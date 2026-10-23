@@ -28,6 +28,22 @@ import subprocess
 import shutil
 import tempfile
 import json
+import re
+
+def is_newer_version(remote_ver, current_ver):
+    """Compares version strings robustly (e.g. R1.0.2.1 vs R1.0.2.0)."""
+    try:
+        def parse(v):
+            cleaned = re.sub(r'[^0-9.]', '', str(v))
+            return [int(x) for x in cleaned.split('.') if x.isdigit()]
+        r = parse(remote_ver)
+        c = parse(current_ver)
+        if not c:
+            return True
+        return r > c
+    except Exception:
+        return str(remote_ver) > str(current_ver)
+
 # Import local modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ui import dialog_fixer
@@ -870,6 +886,9 @@ class CyberFlashUltra:
         
         # Initialize default protocol layout (SPI Mode)
         self.switch_protocol_layout("SPI")
+
+        # Silent automatic update check on application startup (delayed 3.0s for smooth launch)
+        self.root.after(3000, self.auto_check_update_startup)
 
     def create_nav_btn(self, text, command, is_danger=False):
         # Store for loose packing
@@ -2021,14 +2040,120 @@ class CyberFlashUltra:
 
         self.show_progress_dialog(f"READING CHIP", size, read_task)
 
+    def auto_check_update_startup(self):
+        """Silent background update checker triggered automatically on software launch."""
+        def _check_worker():
+            try:
+                response = requests.get(self.update_url, timeout=8)
+                if response.status_code == 200:
+                    data = response.json()
+                    remote_version = data.get("version", "0.0.0")
+                    download_url = data.get("url", "")
+                    changelog = data.get("changelog", "No details provided.")
 
+                    # Convert GitHub Blob URL to Raw URL if needed
+                    if "github.com" in download_url and "/blob/" in download_url:
+                        download_url = download_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
+                    current_ver_str = self.app_version
+                    if is_newer_version(remote_version, current_ver_str):
+                        self.root.after(0, lambda: self._prompt_auto_update(remote_version, changelog, download_url))
+            except Exception:
+                # Completely silent on startup failure/offline - do not interrupt user
+                pass
+
+        threading.Thread(target=_check_worker, daemon=True).start()
+
+    def _prompt_auto_update(self, remote_version, changelog, download_url):
+        """Displays a cyberpunk update prompt when an update is detected on startup."""
+        if getattr(self, "_update_prompt_active", False) or getattr(self, "io_busy", False):
+            return
+        self._update_prompt_active = True
+
+        win = tk.Toplevel(self.root)
+        win.title("R1 AUTO UPDATE")
+        win.geometry("480x360")
+        win.configure(bg=self.clr_bg, highlightbackground=self.clr_neon_blue, highlightthickness=2)
+        win.transient(self.root)
+        win.attributes("-topmost", True)
+        
+        self.root.update_idletasks()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() // 2) - 240
+        y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - 180
+        win.geometry(f"+{x}+{y}")
+
+        def on_close():
+            self._update_prompt_active = False
+            win.destroy()
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
+        tk.Label(win, text="⚡ NEW UPDATE AVAILABLE ⚡", bg=self.clr_bg, fg=self.clr_neon_blue,
+                 font=("Orbitron", 12, "bold"), pady=15).pack(fill=tk.X)
+
+        ver_card = tk.Frame(win, bg=self.clr_card, highlightbackground=self.clr_border, highlightthickness=1)
+        ver_card.pack(fill=tk.X, padx=25, pady=5)
+
+        tk.Label(ver_card, text=f"Current Version:   {self.app_version}", bg=self.clr_card, fg=self.clr_dim,
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=15, pady=(8, 2))
+        tk.Label(ver_card, text=f"New Version:       v{remote_version}", bg=self.clr_card, fg="#00FFCC",
+                 font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=15, pady=(0, 8))
+
+        changes_frame = tk.Frame(win, bg=self.clr_bg)
+        changes_frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=8)
+
+        tk.Label(changes_frame, text="What's New:", bg=self.clr_bg, fg="white",
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w")
+
+        tk.Label(changes_frame, text=changelog, bg=self.clr_bg, fg=self.clr_dim,
+                 font=("Segoe UI", 9), justify=tk.LEFT, wraplength=420).pack(anchor="w", pady=(3, 5))
+
+        btn_frame = tk.Frame(win, bg=self.clr_bg)
+        btn_frame.pack(fill=tk.X, padx=25, pady=(10, 20))
+
+        def confirm_update():
+            on_close()
+            self.action_update_direct(remote_version, download_url)
+
+        btn_update = tk.Button(btn_frame, text="🚀 UPDATE NOW", bg=self.clr_neon_blue, fg="black",
+                               activebackground="white", activeforeground="black",
+                               font=("Orbitron", 10, "bold"), relief="flat", padx=18, pady=8,
+                               cursor="hand2", command=confirm_update)
+        btn_update.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+        btn_later = tk.Button(btn_frame, text="REMIND LATER", bg=self.clr_card, fg=self.clr_dim,
+                              activebackground=self.clr_card, activeforeground="white",
+                              font=("Orbitron", 9), relief="flat", padx=12, pady=8,
+                              cursor="hand2", command=on_close)
+        btn_later.pack(side=tk.RIGHT)
+
+    def action_update_direct(self, remote_version, download_url):
+        """Directly launch update downloader and restart with progress UI."""
+        win = tk.Toplevel(self.root)
+        win.title("R1 UPDATE MANAGER")
+        win.geometry("450x300")
+        win.configure(bg=self.clr_bg, highlightbackground=self.clr_neon_blue, highlightthickness=1)
+        win.transient(self.root)
+        win.grab_set()
+
+        self.root.update_idletasks()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() // 2) - 225
+        y = self.root.winfo_rooty() + (self.root.winfo_height() // 2) - 150
+        win.geometry(f"+{x}+{y}")
+
+        tk.Label(win, text="SYSTEM AUTO UPDATE", bg=self.clr_bg, fg=self.clr_neon_blue, 
+                 font=("Orbitron", 12, "bold"), pady=15).pack(fill=tk.X)
+
+        tk.Label(win, text=f"Upgrading to v{remote_version}", bg=self.clr_bg, fg="#00FFCC", 
+                 font=("Segoe UI", 10, "bold")).pack(pady=(0, 10))
+
+        self.set_safe_mode(True)
+        self.start_update_download(win, download_url, auto_restart=True)
 
     def action_update(self):
-        """Check for updates via GitHub JSON - SAFE UPDATE SYSTEM."""
-        # Step 1: Disable Critical Critical Operations
-        self.btn_map_enabled = False # disable main buttons roughly
-        # Better: Explicitly disable dangerous ones
-        # self.start_update_mode() # Helper if we had one
+        """Check for updates via GitHub JSON - MANUAL SAFE UPDATE SYSTEM."""
+        # Disable Critical Operations
+        self.btn_map_enabled = False
         
         win = tk.Toplevel(self.root)
         win.title("R1 UPDATE MANAGER")
@@ -2064,7 +2189,7 @@ class CyberFlashUltra:
                     remote_version = data.get("version", "0.0.0")
                     download_url = data.get("url", "")
                     
-                    # [AUTO-FIX] Convert GitHub Blob URL to Raw URL
+                    # Convert GitHub Blob URL to Raw URL if needed
                     if "github.com" in download_url and "/blob/" in download_url:
                         download_url = download_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
                     
@@ -2074,22 +2199,9 @@ class CyberFlashUltra:
                         prog.stop()
                         prog.pack_forget()
                         
-                        # Handle "Unknown Version" case
                         current_ver_str = self.app_version
-                        is_unknown = "Unknown" in current_ver_str
-                        
-                        update_available = False
-                        if is_unknown:
-                             # If local is unknown, assume update is available if remote is valid
-                             update_available = True
-                        elif remote_version > current_ver_str:
-                             update_available = True
-                        
-                        if update_available:
+                        if is_newer_version(remote_version, current_ver_str):
                             status_txt = f"NEW VERSION FOUND: v{remote_version}"
-                            if is_unknown:
-                                status_txt += " (Local: Unknown)"
-                                
                             status_lbl.config(text=status_txt, fg=self.clr_neon_blue)
                             # Show changelog
                             log_lbl = tk.Label(win, text=f"Changes: {changelog}", bg=self.clr_bg, fg=self.clr_dim, 
@@ -2098,7 +2210,7 @@ class CyberFlashUltra:
                             
                             tk.Button(win, text="DOWNLOAD & UPDATE", bg=self.clr_neon_blue, fg="black", 
                                       font=("Orbitron", 10, "bold"), relief="flat", padx=20, pady=10,
-                                      command=lambda: self.start_update_download(win, download_url)).pack(pady=20)
+                                      command=lambda: self.start_update_download(win, download_url, auto_restart=True)).pack(pady=20)
                         else:
                             status_lbl.config(text=f"YOU ARE ON THE LATEST VERSION (v{self.app_version})")
                             tk.Button(win, text="CLOSE", bg=self.clr_card, fg="white", font=("Orbitron", 9),
@@ -2117,9 +2229,6 @@ class CyberFlashUltra:
     def set_safe_mode(self, enabled):
         """Disable dangerous buttons during update checks."""
         state = tk.DISABLED if enabled else tk.NORMAL
-        # Iterate over known button references or search children
-        # Since we use self.nav_buttons desc, let's just use loose finding for now or explicit references if we stored them
-        # We stored them in self.main_btn_frame children
         for widget in self.main_btn_frame.winfo_children():
             if isinstance(widget, tk.Button):
                 txt = widget.cget('text')
@@ -2127,7 +2236,7 @@ class CyberFlashUltra:
                 if txt not in ["READ", "RD", "SM", "IDENTIFY", "OPEN", "SAVE", "WIRING"]:
                      widget.config(state=state)
 
-    def start_update_download(self, window, url):
+    def start_update_download(self, window, url, auto_restart=False):
         """Download update.zip, validate manifest, and extract payload."""
         for widget in window.winfo_children():
             if isinstance(widget, tk.Button): widget.config(state=tk.DISABLED)
@@ -2148,14 +2257,12 @@ class CyberFlashUltra:
                 
                 cache_dir = os.path.join(base_dir, "update_cache")
                 
-                # [FIX] Safer Clean-up
+                # Safer Clean-up
                 if os.path.exists(cache_dir):
                     try:
                         shutil.rmtree(cache_dir)
                     except Exception as e:
                         print(f"Update Cache Cleanup Failed: {e}")
-                        # If we can't clean, try to proceed, but it might fail later.
-                        # Important: Don't crash here.
                 
                 os.makedirs(cache_dir, exist_ok=True)
                 
@@ -2185,7 +2292,6 @@ class CyberFlashUltra:
                 # 2. Validate ZIP Structure
                 self.root.after(0, lambda: status_lbl.config(text="Validating Package..."))
                 
-                # [FIX] Check for valid zip before opening, handle potential hangs
                 if not zipfile.is_zipfile(local_zip):
                     raise ValueError("Invalid ZIP file format.")
                 
@@ -2193,12 +2299,9 @@ class CyberFlashUltra:
                     with zipfile.ZipFile(local_zip, 'r') as zf:
                         file_list = zf.namelist()
                         
-                        # [FIX] Case-insensitive check for manifest/version
-                        # But standard requires exact names usually. Let's stick to standard but be safe.
                         if "manifest.json" not in file_list:
                             raise ValueError("Missing manifest.json in update package.")
                         if "version.txt" not in file_list:
-                             # Allow package to missing version.txt if manifest has it, but our logic requires it.
                             raise ValueError("Missing version.txt in update package.")
                         
                         # 3. Extract & Validate Manifest
@@ -2211,13 +2314,12 @@ class CyberFlashUltra:
                         # Security Check: Forbidden Paths
                         forbidden = ["drivers/", "bios_dumps/", "logs/"]
                         for fpath in manifest.get("files", []):
-                             # Normalize path check
                              norm_path = fpath.replace("\\", "/")
                              for bad in forbidden:
-                                if bad in norm_path:
-                                     if norm_path.startswith("drivers/"): raise ValueError(f"Security Violation: Update attempts to modify driver {fpath}")
-                                     if norm_path.startswith("logs/"): raise ValueError(f"Security Violation: Update attempts to modify logs {fpath}")
-                                     if ".." in norm_path: raise ValueError("Security Violation: Directory Traversal detected.")
+                                 if bad in norm_path:
+                                      if norm_path.startswith("drivers/"): raise ValueError(f"Security Violation: Update attempts to modify driver {fpath}")
+                                      if norm_path.startswith("logs/"): raise ValueError(f"Security Violation: Update attempts to modify logs {fpath}")
+                                      if ".." in norm_path: raise ValueError("Security Violation: Directory Traversal detected.")
 
                         # 4. Extract Payload
                         self.root.after(0, lambda: status_lbl.config(text="Extracting Payload..."))
@@ -2234,10 +2336,13 @@ class CyberFlashUltra:
                      raise RuntimeError(f"Package validation failed: {z_err}")
                 
                 # Ready for Updater.exe
-                self.root.after(0, lambda: self.prompt_restart(base_dir))
+                if auto_restart:
+                    self.root.after(0, lambda: status_lbl.config(text="Update verified! Restarting application in 1s...", fg="#00FFCC"))
+                    self.root.after(1000, lambda: self.launch_updater(base_dir))
+                else:
+                    self.root.after(0, lambda: self.prompt_restart(base_dir))
 
             except Exception as e:
-                # [FIX] Ensure UI is unblocked
                 self.root.after(0, lambda: [messagebox.showerror("UPDATE FAILED", f"Error: {str(e)}"), self.set_safe_mode(False), window.destroy()])
         
         threading.Thread(target=download_worker, daemon=True).start()
